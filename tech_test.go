@@ -12,8 +12,8 @@ func TestFingerScan(t *testing.T) {
 
 	//output := ""
 	//proxy := ""
-	//url := "http://113.31.155.8"
-	url := "http://39.103.172.110/"
+	url := "http://113.31.155.8"
+	//url := "http://39.103.172.110/"
 	resp, err := http.DefaultClient.Get(url)
 	if err != nil {
 		log.Fatal(err)

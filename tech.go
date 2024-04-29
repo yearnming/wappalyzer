@@ -91,8 +91,11 @@ func Wappalyzer(headers map[string][]string, body []byte, url string) map[string
 		log.Fatal(err)
 	}
 	fingerprints := wappalyzerClient.Fingerprint(headers, body)
-
-	fingerprints[cms] = struct{}{}
+	if cms != "" {
+		// 如果cms不为空，将其添加到fingerprints映射中
+		fingerprints[cms] = struct{}{}
+	}
+	//fingerprints[cms] = struct{}{}
 	return fingerprints
 }
 
