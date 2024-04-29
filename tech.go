@@ -80,14 +80,12 @@ func Wappalyzer(headers map[string][]string, body []byte, url string) map[string
 		Wg:       sync.WaitGroup{},
 		Thread:   thread,
 	}
-	fmt.Printf("[ url 为: %v ]\n", url)
+	//fmt.Printf("[ url 为: %v ]\n", url)
 	s.FingerScan(headers, body, url)
-	color.RGBStyleFromString("244,211,49").Println("\n重点资产：")
-	color.RGBStyleFromString("237,64,35").Printf(fmt.Sprintf("[ %s ]\n", s.FocusResult.Cms))
+	//color.RGBStyleFromString("244,211,49").Println("\n重点资产：")
+	//color.RGBStyleFromString("237,64,35").Printf(fmt.Sprintf("[ %s ]\n", s.FocusResult.Cms))
 	cms := s.FocusResult.Cms
 	//wappalyzer
-	//data, _ := io.ReadAll(resp.Body) // 例如，忽略错误
-
 	wappalyzerClient, err := wappalyzer1.New()
 	if err != nil {
 		log.Fatal(err)
@@ -326,7 +324,7 @@ func getfavicon(httpbody string, turl string) string {
 	} else {
 		faviconpath = turl + "/favicon.ico"
 	}
-	fmt.Printf("[ favicon 路径 :%s ]\n", faviconpath)
+	//fmt.Printf("[ favicon 路径 :%s ]\n", faviconpath)
 	return favicohash(faviconpath)
 }
 
