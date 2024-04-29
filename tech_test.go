@@ -2,6 +2,7 @@ package wappalyzer
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"testing"
@@ -17,9 +18,9 @@ func TestFingerScan(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//data, _ := io.ReadAll(resp.Body) // 例如，忽略错误
+	data, _ := io.ReadAll(resp.Body) // 例如，忽略错误
 
-	fingerprints := Wappalyzer(resp)
+	fingerprints := Wappalyzer(resp.Header, data, url)
 	fmt.Printf("[ wappalyzer: %v ]\n", fingerprints)
 
 }

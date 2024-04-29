@@ -13,7 +13,6 @@ import (
 	"github.com/yinheli/mahonia"
 	"golang.org/x/net/html/charset"
 	"hash"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -34,18 +33,18 @@ type FinScan struct {
 	Thread      int
 	Output      string
 	Proxy       string
-	AllResult   []Outrestul
+	AllResult   Outrestul
 	FocusResult Outrestul
 	Finpx       *Packjson
 }
 
 type Outrestul struct {
 	//Url        string `json:"url"`
-	Cms        string `json:"cms"`
-	Server     string `json:"server"`
-	Statuscode int    `json:"statuscode"`
-	Length     int    `json:"length"`
-	Title      string `json:"title"`
+	Cms    string `json:"cms"`
+	Server string `json:"server"`
+	//Statuscode int    `json:"statuscode"`
+	//Length     int    `json:"length"`
+	Title string `json:"title"`
 }
 
 //type Packjson struct {
@@ -61,60 +60,45 @@ type Outrestul struct {
 
 type resps struct {
 	//url        string
-	body       string
-	header     map[string][]string
-	server     string
-	statuscode int
-	length     int
-	title      string
+	body   string
+	header map[string][]string
+	server string
+	//statuscode int
+	//length     int
+	title string
 	//jsurl      []string
 	favhash string
 }
 
 // Wappalyzer 得将ehole得指纹识别更改接受的接口和返回值
 // Wappalyzer 合并了两个指纹 ehole wappalyzergo
-func Wappalyzer(resp *http.Response) map[string]struct{} {
+func Wappalyzer(headers map[string][]string, body []byte, url string) map[string]struct{} {
 	thread := 100
 	s := &FinScan{
 		UrlQueue: queue.NewQueue(),
 		Ch:       make(chan []string, thread),
 		Wg:       sync.WaitGroup{},
 		Thread:   thread,
-		//Output:   output,
-		//Proxy:    proxy,
-		//AllResult: []Outrestul{},
-		//FocusResult: []Outrestul{},
 	}
-	fmt.Printf(fmt.Sprintf("[ url 为 :%s ]\n", resp.Request.URL))
-	s.FingerScan(resp)
+	fmt.Printf("[ url 为: %v ]\n", url)
+	s.FingerScan(headers, body, url)
 	color.RGBStyleFromString("244,211,49").Println("\n重点资产：")
-	//for _, aas := range s.FocusResult {
-	//	color.RGBStyleFromString("237,64,35").Printf(fmt.Sprintf("[ %s", aas.Cms))
-	//	fmt.Printf(fmt.Sprintf(" | %s | %d | %d | %s ]\n", aas.Server, aas.Statuscode, aas.Length, aas.Title))
-	//	//fingerprints[aas.Cms] = struct{}{}
-	//	//fmt.Printf("[ 完整指纹: %v \n]", fingerprints)
-	//}
 	color.RGBStyleFromString("237,64,35").Printf(fmt.Sprintf("[ %s ]\n", s.FocusResult.Cms))
-
-	//if s.Output != "" {
-	//	outfile(s.Output, s.AllResult)
-	//}
-
 	cms := s.FocusResult.Cms
 	//wappalyzer
-	data, _ := io.ReadAll(resp.Body) // 例如，忽略错误
+	//data, _ := io.ReadAll(resp.Body) // 例如，忽略错误
 
 	wappalyzerClient, err := wappalyzer1.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	fingerprints := wappalyzerClient.Fingerprint(resp.Header, data)
+	fingerprints := wappalyzerClient.Fingerprint(headers, body)
 
 	fingerprints[cms] = struct{}{}
 	return fingerprints
 }
 
-func (s *FinScan) FingerScan(resp *http.Response) {
+func (s *FinScan) FingerScan(headers map[string][]string, body []byte, url string) {
 
 	err := LoadWebfingerprint(fingerprints)
 	s.Finpx = GetWebfingerprint()
@@ -123,12 +107,12 @@ func (s *FinScan) FingerScan(resp *http.Response) {
 		os.Exit(1)
 	}
 	var data *resps
-	data, err = httprequest(resp)
+	data, err = httprequest(headers, body, url)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	headers := MapToJson(data.header)
+	headerss := MapToJson(headers)
 	var cms []string
 	for _, finp := range s.Finpx.Fingerprint {
 		if finp.Location == "body" {
@@ -150,12 +134,12 @@ func (s *FinScan) FingerScan(resp *http.Response) {
 		}
 		if finp.Location == "header" {
 			if finp.Method == "keyword" {
-				if iskeyword(headers, finp.Keyword) {
+				if iskeyword(headerss, finp.Keyword) {
 					cms = append(cms, finp.Cms)
 				}
 			}
 			if finp.Method == "regular" {
-				if isregular(headers, finp.Keyword) {
+				if isregular(headerss, finp.Keyword) {
 					cms = append(cms, finp.Cms)
 				}
 			}
@@ -175,7 +159,7 @@ func (s *FinScan) FingerScan(resp *http.Response) {
 	}
 	cms = RemoveDuplicatesAndEmpty(cms)
 	cmss := strings.Join(cms, ",")
-	out := Outrestul{cmss, data.server, data.statuscode, data.length, data.title}
+	out := Outrestul{cmss, data.server, data.title}
 	//s.AllResult = append(s.AllResult, out)
 	s.FocusResult = out
 	//if len(out.Cms) != 0 {
@@ -189,14 +173,28 @@ func (s *FinScan) FingerScan(resp *http.Response) {
 	//}
 }
 
-func httprequest(resp *http.Response) (*resps, error) {
-	result, _ := ioutil.ReadAll(resp.Body)
-	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+func httprequest(headers map[string][]string, body []byte, url string) (*resps, error) {
+	result := body
+
+	var contentType string
+	// 检查headers中是否存在"Content-Type"键
+	if contentTypeValues, ok := headers["Content-Type"]; ok && len(contentType) > 0 {
+		// 假设我们只关心第一个Content-Type值
+		//contentTypeValue := contentType[0]
+		contentTypeValue := strings.Join(contentTypeValues, ", ")
+		// 可以在这里对contentTypeValue进行处理，例如转换为小写
+		contentType = strings.ToLower(contentTypeValue)
+		// 使用获取到的Content-Type值创建resps结构体实例
+
+	}
+
+	//contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+
 	httpbody := string(result)
 	httpbody = toUtf8(httpbody, contentType)
-	url := resp.Request.URL.String()
+	//url := resp.Request.URL.String()
 	title := gettitle(httpbody)
-	httpheader := resp.Header
+	httpheader := headers
 	var server string
 	capital, ok := httpheader["Server"]
 	if ok {
@@ -216,7 +214,7 @@ func httprequest(resp *http.Response) (*resps, error) {
 	//	jsurl = []string{""}
 	//}
 	favhash := getfavicon(httpbody, url)
-	s := resps{httpbody, resp.Header, server, resp.StatusCode, len(httpbody), title, favhash}
+	s := resps{httpbody, headers, server, title, favhash}
 	return &s, nil
 	//return map[string]struct{}{}
 }

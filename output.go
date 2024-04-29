@@ -36,8 +36,8 @@ func outxlsx(filename string, msg []Outrestul) {
 		//xlsx.SetCellValue("Sheet1", "A"+strconv.Itoa(k+2), v.Url)
 		xlsx.SetCellValue("Sheet1", "B"+strconv.Itoa(k+2), v.Cms)
 		xlsx.SetCellValue("Sheet1", "C"+strconv.Itoa(k+2), v.Server)
-		xlsx.SetCellValue("Sheet1", "D"+strconv.Itoa(k+2), v.Statuscode)
-		xlsx.SetCellValue("Sheet1", "E"+strconv.Itoa(k+2), v.Length)
+		//xlsx.SetCellValue("Sheet1", "D"+strconv.Itoa(k+2), v.Statuscode)
+		//xlsx.SetCellValue("Sheet1", "E"+strconv.Itoa(k+2), v.Length)
 		xlsx.SetCellValue("Sheet1", "F"+strconv.Itoa(k+2), v.Title)
 	}
 	err := xlsx.SaveAs(filename)
