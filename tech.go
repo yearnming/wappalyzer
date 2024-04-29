@@ -35,12 +35,12 @@ type FinScan struct {
 	Output      string
 	Proxy       string
 	AllResult   []Outrestul
-	FocusResult []Outrestul
+	FocusResult Outrestul
 	Finpx       *Packjson
 }
 
 type Outrestul struct {
-	Url        string `json:"url"`
+	//Url        string `json:"url"`
 	Cms        string `json:"cms"`
 	Server     string `json:"server"`
 	Statuscode int    `json:"statuscode"`
@@ -60,7 +60,7 @@ type Outrestul struct {
 //}
 
 type resps struct {
-	url        string
+	//url        string
 	body       string
 	header     map[string][]string
 	server     string
@@ -71,13 +71,37 @@ type resps struct {
 	favhash string
 }
 
-// 得将ehole得指纹识别更改接受的接口和返回值
-
-func New() {
-	resp, err := http.DefaultClient.Get("http://39.103.172.110/")
-	if err != nil {
-		log.Fatal(err)
+// Wappalyzer 得将ehole得指纹识别更改接受的接口和返回值
+// Wappalyzer 合并了两个指纹 ehole wappalyzergo
+func Wappalyzer(resp *http.Response) map[string]struct{} {
+	thread := 100
+	s := &FinScan{
+		UrlQueue: queue.NewQueue(),
+		Ch:       make(chan []string, thread),
+		Wg:       sync.WaitGroup{},
+		Thread:   thread,
+		//Output:   output,
+		//Proxy:    proxy,
+		//AllResult: []Outrestul{},
+		//FocusResult: []Outrestul{},
 	}
+	fmt.Printf(fmt.Sprintf("[ url 为 :%s ]\n", resp.Request.URL))
+	s.FingerScan(resp)
+	color.RGBStyleFromString("244,211,49").Println("\n重点资产：")
+	//for _, aas := range s.FocusResult {
+	//	color.RGBStyleFromString("237,64,35").Printf(fmt.Sprintf("[ %s", aas.Cms))
+	//	fmt.Printf(fmt.Sprintf(" | %s | %d | %d | %s ]\n", aas.Server, aas.Statuscode, aas.Length, aas.Title))
+	//	//fingerprints[aas.Cms] = struct{}{}
+	//	//fmt.Printf("[ 完整指纹: %v \n]", fingerprints)
+	//}
+	color.RGBStyleFromString("237,64,35").Printf(fmt.Sprintf("[ %s ]\n", s.FocusResult.Cms))
+
+	//if s.Output != "" {
+	//	outfile(s.Output, s.AllResult)
+	//}
+
+	cms := s.FocusResult.Cms
+	//wappalyzer
 	data, _ := io.ReadAll(resp.Body) // 例如，忽略错误
 
 	wappalyzerClient, err := wappalyzer1.New()
@@ -85,21 +109,21 @@ func New() {
 		log.Fatal(err)
 	}
 	fingerprints := wappalyzerClient.Fingerprint(resp.Header, data)
-	fmt.Printf("%v\n", fingerprints)
-	// Output: map[Acquia Cloud Platform:{} Amazon EC2:{} Apache:{} Cloudflare:{} Drupal:{} PHP:{} Percona:{} React:{} Varnish:{}]
 
-	fingerprintsWithCats := wappalyzerClient.FingerprintWithCats(resp.Header, data)
-	fmt.Printf("%v\n", fingerprintsWithCats)
+	fingerprints[cms] = struct{}{}
+	return fingerprints
 }
 
-func (s *FinScan) FingerScan(resp *http.Response, url string) {
-	err := LoadWebfingerprint("D:\\Go\\ehole\\finger.json")
+func (s *FinScan) FingerScan(resp *http.Response) {
+
+	err := LoadWebfingerprint(fingerprints)
+	s.Finpx = GetWebfingerprint()
 	if err != nil {
 		color.RGBStyleFromString("237,64,35").Println("[error] fingerprint file error!!!")
 		os.Exit(1)
 	}
 	var data *resps
-	data, err = httprequest(resp, url)
+	data, err = httprequest(resp)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -151,23 +175,26 @@ func (s *FinScan) FingerScan(resp *http.Response, url string) {
 	}
 	cms = RemoveDuplicatesAndEmpty(cms)
 	cmss := strings.Join(cms, ",")
-	out := Outrestul{data.url, cmss, data.server, data.statuscode, data.length, data.title}
-	s.AllResult = append(s.AllResult, out)
-	if len(out.Cms) != 0 {
-		outstr := fmt.Sprintf("[ %s | %s | %s | %d | %d | %s ]", out.Url, out.Cms, out.Server, out.Statuscode, out.Length, out.Title)
-		color.RGBStyleFromString("237,64,35").Println(outstr)
-		s.FocusResult = append(s.FocusResult, out)
-	} else {
-		outstr := fmt.Sprintf("[ %s | %s | %s | %d | %d | %s ]", out.Url, out.Cms, out.Server, out.Statuscode, out.Length, out.Title)
-		fmt.Println(outstr)
-	}
+	out := Outrestul{cmss, data.server, data.statuscode, data.length, data.title}
+	//s.AllResult = append(s.AllResult, out)
+	s.FocusResult = out
+	//if len(out.Cms) != 0 {
+	//	outstr := fmt.Sprintf("[ %s | %s | %d | %d | %s ]", out.Cms, out.Server, out.Statuscode, out.Length, out.Title)
+	//	color.RGBStyleFromString("237,64,35").Println(outstr)
+	//	//s.FocusResult = append(s.FocusResult, out)
+	//	s.FocusResult = out
+	//} else {
+	//	outstr := fmt.Sprintf("[ %s | %s | %d | %d | %s ]", out.Cms, out.Server, out.Statuscode, out.Length, out.Title)
+	//	fmt.Println(outstr)
+	//}
 }
 
-func httprequest(resp *http.Response, url string) (*resps, error) {
+func httprequest(resp *http.Response) (*resps, error) {
 	result, _ := ioutil.ReadAll(resp.Body)
 	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
 	httpbody := string(result)
 	httpbody = toUtf8(httpbody, contentType)
+	url := resp.Request.URL.String()
 	title := gettitle(httpbody)
 	httpheader := resp.Header
 	var server string
@@ -189,7 +216,7 @@ func httprequest(resp *http.Response, url string) (*resps, error) {
 	//	jsurl = []string{""}
 	//}
 	favhash := getfavicon(httpbody, url)
-	s := resps{url, httpbody, resp.Header, server, resp.StatusCode, len(httpbody), title, favhash}
+	s := resps{httpbody, resp.Header, server, resp.StatusCode, len(httpbody), title, favhash}
 	return &s, nil
 	//return map[string]struct{}{}
 }
@@ -301,6 +328,7 @@ func getfavicon(httpbody string, turl string) string {
 	} else {
 		faviconpath = turl + "/favicon.ico"
 	}
+	fmt.Printf("[ favicon 路径 :%s ]\n", faviconpath)
 	return favicohash(faviconpath)
 }
 
